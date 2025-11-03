@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+// using built-in Material icons for compatibility and consistency
 import '../data/mock_data.dart';
 import '../models/parking_zone.dart';
 import 'zone_details_screen.dart';
@@ -15,11 +16,18 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+// We need TickerProviderStateMixin for the parking timer
+class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   late List<ParkingZone> zones;
-  Timer? _timer;
+  Timer? _simulationTimer;
   final Random _random = Random();
-  // We no longer need the AnimationController or TickerProvider
+
+  // --- NEW STATE VARIABLES ---
+  bool _isParked = false;
+  ParkingZone? _parkedZone;
+  Timer? _parkingTimer;
+  Duration _parkingDuration = Duration.zero;
+  // --- END NEW STATE ---
 
   @override
   void initState() {
@@ -29,7 +37,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _startLiveSimulation() {
-    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    _simulationTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
@@ -44,33 +52,55 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  // --- NEW TIMER CONTROLS ---
+  void _startParkingTimer() {
+    _parkingDuration = Duration.zero;
+    _parkingTimer?.cancel(); // Cancel any existing timer
+    _parkingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _parkingDuration = _parkingDuration + const Duration(seconds: 1);
+      });
+    });
+  }
+
+  String _formatDuration(Duration d) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    String twoDigitMinutes = twoDigits(d.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(d.inSeconds.remainder(60));
+    return "${twoDigits(d.inHours)}:$twoDigitMinutes:$twoDigitSeconds";
+  }
+  // --- END TIMER CONTROLS ---
+
   @override
   void dispose() {
-    _timer?.cancel();
+    _simulationTimer?.cancel();
+    _parkingTimer?.cancel();
     super.dispose();
   }
 
   Color _getZoneColor(double probability) {
     if (probability > 0.7) {
-      return const Color(0xFF10B981); // Modern green
+      return const Color(0xFF10B981);
     } else if (probability > 0.3) {
-      return const Color(0xFFF59E0B); // Modern amber
+      return const Color(0xFFF59E0B);
     } else {
-      return const Color(0xFFEF4444); // Modern red
+      return const Color(0xFFEF4444);
     }
   }
 
-  // This is the new, modern way to show details
+  // This still shows the modal sheet for details
   void _onZoneTap(ParkingZone zone) {
-    // This is the new, modern way
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent, // Make sheet bg transparent
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        // We wrap this in a draggable sheet
         return DraggableScrollableSheet(
-          initialChildSize: 0.6, // Start 60% high
+          initialChildSize: 0.6,
           minChildSize: 0.4,
           maxChildSize: 0.9,
           builder: (_, scrollController) {
@@ -82,11 +112,11 @@ class _MapScreenState extends State<MapScreen> {
                   topRight: Radius.circular(20),
                 ),
               ),
-              // We re-use the ZoneDetailsScreen widget here,
-              // but we MUST pass the scrollController to it.
               child: ZoneDetailsScreen(
                 zone: zone,
                 scrollController: scrollController,
+                // THIS IS THE NEW PART: Pass the _parkInZone function
+                onParkHere: _parkInZone,
               ),
             );
           },
@@ -95,164 +125,392 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  // --- NEW FUNCTIONS TO MANAGE STATE ---
+  void _parkInZone(ParkingZone zone) {
+    Navigator.pop(context); // Close the details modal
+    setState(() {
+      _isParked = true;
+      _parkedZone = zone;
+    });
+    _startParkingTimer(); // Start the timer!
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Parked at ${zone.name}! +20 points'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _leaveZone() {
+    setState(() {
+      _isParked = false;
+      _parkedZone = null;
+    });
+    _parkingTimer?.cancel();
+    _parkingDuration = Duration.zero;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Parking session ended.')),
+    );
+  }
+  // --- END NEW FUNCTIONS ---
+
   @override
   Widget build(BuildContext context) {
-    // We remove the AppBar and FAB, and use a Stack as the body
     return Scaffold(
       body: Stack(
         children: [
           FlutterMap(
             options: MapOptions(
-              initialCenter: const LatLng(18.604792, 73.716666), 
+              initialCenter: const LatLng(18.604792, 73.716666),
               initialZoom: 18.0,
               onTap: (tapPos, latlng) {
-                for (final zone in zones) {
-                  if (_pointInPolygon(latlng, zone.boundaries)) {
-                    _onZoneTap(zone);
-                    return;
+                // Only allow tapping zones if NOT parked
+                if (!_isParked) {
+                  for (final zone in zones) {
+                    if (_pointInPolygon(latlng, zone.boundaries)) {
+                      _onZoneTap(zone);
+                      return;
+                    }
                   }
                 }
               },
             ),
             children: [
               TileLayer(
-                urlTemplate:
-                    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                userAgentPackageName: 'com.example.spotto',
+        urlTemplate:
+          'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+        subdomains: const ['a', 'b', 'c', 'd'],
+        userAgentPackageName: 'com.example.spotto',
               ),
               PolygonLayer(
                 polygons: zones.map((zone) {
                   final baseColor = _getZoneColor(zone.probability);
                   return Polygon(
                     points: zone.boundaries,
-                    color: baseColor.withOpacity(0.20),
-                    borderColor: baseColor.withOpacity(0.85),
-                    borderStrokeWidth: 2.5,
+                    // Dim the polygons if we're parked
+                    color: _isParked
+                        ? baseColor.withOpacity(0.1)
+                        : baseColor.withOpacity(0.20),
+                    borderColor: _isParked
+                        ? baseColor.withOpacity(0.3)
+                        : baseColor.withOpacity(0.85),
+                    borderStrokeWidth: 3.0,
                     isFilled: true,
                   );
                 }).toList(),
               ),
-              MarkerLayer(
-                markers: zones.map((zone) {
-                  final centroid = _centroid(zone.boundaries);
-                  return Marker(
-                    width: 48,
-                    height: 48,
-                    point: centroid,
-                    child: GestureDetector(
-                      onTap: () => _onZoneTap(zone),
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0.8, end: 1.0),
-                        duration: const Duration(milliseconds: 800),
-                        curve: Curves.elasticOut,
-                        builder: (context, scale, child) {
-                          return Transform.scale(
-                            scale: scale,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    _getZoneColor(zone.probability),
-                                    _getZoneColor(zone.probability)
-                                        .withOpacity(0.8),
-                                  ],
-                                ),
-                                border:
-                                    Border.all(color: Colors.white, width: 3),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: _getZoneColor(zone.probability)
-                                        .withOpacity(0.4),
-                                    blurRadius: 12,
-                                    spreadRadius: 2,
-                                    offset: const Offset(0, 4),
-                                  )
-                                ],
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '${(zone.probability * 100).toInt()}%',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
+              if (!_isParked) // Only show markers if not parked
+                MarkerLayer(
+                  markers: zones.map((zone) {
+                    final centroid = _centroid(zone.boundaries);
+                    return Marker(
+                      width: 48,
+                      height: 48,
+                      point: centroid,
+                      child: GestureDetector(
+                        onTap: () => _onZoneTap(zone),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                _getZoneColor(zone.probability),
+                                _getZoneColor(zone.probability)
+                                    .withOpacity(0.8),
+                              ],
+                            ),
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _getZoneColor(zone.probability)
+                                    .withOpacity(0.4),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              )
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${(zone.probability * 100).toInt()}%',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
-                    ),
-                  );
-                }).toList(),
-              ),
+                    );
+                  }).toList(),
+                ),
             ],
           ),
-          // This is the new Search Bar overlay
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 16,
-            left: 16,
-            right: 16,
-            child: Card(
-              elevation: 4,
-              shadowColor: Colors.black.withOpacity(0.1),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8.0),
-                child: TextField(
-                  decoration: InputDecoration(
-                    prefixIcon:
-                        Icon(PhosphorIcons.magnifyingGlass(), color: Colors.grey),
-                    hintText: 'Search destination or zone...',
-                    border: InputBorder.none,
-                    hintStyle: TextStyle(color: Colors.grey),
-                  ),
+
+          // --- CONDITIONAL UI ---
+          // This is the new logic. Show one widget or the other.
+          if (_isParked)
+            _buildActiveParkingCard()
+          else
+            _buildSearchSheet(),
+
+          // Legend overlay (only show if not parked)
+          if (!_isParked)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 90,
+              right: 16,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 20,
+                    )
+                  ],
+                ),
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildLegendItem('High', const Color(0xFF10B981)),
+                    const SizedBox(height: 8),
+                    _buildLegendItem('Medium', const Color(0xFFF59E0B)),
+                    const SizedBox(height: 8),
+                    _buildLegendItem('Low', const Color(0xFFEF4444)),
+                  ],
                 ),
               ),
             ),
-          ),
-          // Your Legend overlay
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 90, // Adjusted top
-            right: 16,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  )
-                ],
-              ),
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildLegendItem('High', const Color(0xFF10B981)),
-                  const SizedBox(height: 8),
-                  _buildLegendItem('Medium', const Color(0xFFF59E0B)),
-                  const SizedBox(height: 8),
-                  _buildLegendItem('Low', const Color(0xFFEF4444)),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
-      // No FloatingActionButton
     );
   }
+
+  // --- NEW WIDGET for Mockup 2 (Search + List) ---
+  Widget _buildSearchSheet() {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.25, // Start low
+      minChildSize: 0.1, // Can be just the search bar
+      maxChildSize: 0.8, // Can expand full
+      builder: (_, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+              )
+            ],
+          ),
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(0),
+            children: [
+              // Grabber handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 5,
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              // Search Bar
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  decoration: InputDecoration(
+          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    hintText: 'Search destination or zone...',
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  "Top-rated near you",
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ),
+              // List of nearby zones
+              ...zones.map((zone) => _buildZoneListItem(zone)).toList(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // --- NEW WIDGET for list item ---
+  Widget _buildZoneListItem(ParkingZone zone) {
+    final color = _getZoneColor(zone.probability);
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(Icons.location_on, color: color),
+      ),
+      title: Text(
+        zone.name,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        '${(zone.probability * 100).toInt()}% chance',
+        style: TextStyle(color: color, fontWeight: FontWeight.bold),
+      ),
+  trailing: const Icon(Icons.chevron_right),
+      onTap: () => _onZoneTap(zone),
+    );
+  }
+
+  // --- NEW WIDGET for Mockup 3 (Active Parking) ---
+  Widget _buildActiveParkingCard() {
+    if (_parkedZone == null) return Container();
+
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+            )
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _parkedZone!.name,
+              style: GoogleFonts.inter(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  "Spot confirmed",
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: Colors.green,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatColumn(
+                  "Time",
+                  _formatDuration(_parkingDuration),
+                ),
+                _buildStatColumn("Rate", "\$2.50/hr"), // Mock data
+                _buildStatColumn("Points", "+20"), // Mock data
+              ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.warning_amber_rounded, size: 20),
+                    label: const Text("Report Full"),
+                    onPressed: () {
+                       ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Report sent! Thanks.')),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.orange,
+                      side: const BorderSide(color: Colors.orange),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.directions_car, size: 20),
+                    label: const Text("Leaving Now"),
+                    onPressed: _leaveZone,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatColumn(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: GoogleFonts.inter(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: Colors.black,
+          ),
+        ),
+      ],
+    );
+  }
+  // --- END NEW WIDGETS ---
 
   Widget _buildLegendItem(String label, Color color) {
     return Row(
@@ -269,7 +527,6 @@ class _MapScreenState extends State<MapScreen> {
               BoxShadow(
                 color: color.withOpacity(0.3),
                 blurRadius: 4,
-                spreadRadius: 1,
               )
             ],
           ),

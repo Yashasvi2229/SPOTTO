@@ -5,12 +5,14 @@ import '../data/mock_data.dart';
 
 class ZoneDetailsScreen extends StatelessWidget {
   final ParkingZone zone;
-  final ScrollController? scrollController; // <-- ADD THIS
+  final ScrollController? scrollController;
+  final void Function(ParkingZone) onParkHere; // <-- ADD THIS
 
   const ZoneDetailsScreen({
     super.key,
     required this.zone,
-    this.scrollController, // <-- AND THIS
+    this.scrollController,
+    required this.onParkHere, // <-- AND THIS
   });
 
   @override
@@ -18,7 +20,6 @@ class ZoneDetailsScreen extends StatelessWidget {
     final details = mockZoneDetails[zone.id];
 
     if (details == null) {
-      // Return a container, as it's inside a sheet
       return Container(
         padding: const EdgeInsets.all(24),
         child: const Center(
@@ -27,13 +28,10 @@ class ZoneDetailsScreen extends StatelessWidget {
       );
     }
 
-    // We no longer need a Scaffold. We're in a sheet.
-    // Replace SingleChildScrollView with ListView
     return ListView(
-      controller: scrollController, // <-- USE THE CONTROLLER
+      controller: scrollController,
       padding: const EdgeInsets.symmetric(vertical: 16.0),
       children: [
-        // This is a "grabber" handle for the sheet
         Center(
           child: Container(
             width: 40,
@@ -45,7 +43,6 @@ class ZoneDetailsScreen extends StatelessWidget {
             ),
           ),
         ),
-        // Add the zone name as a title
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: Text(
@@ -190,7 +187,6 @@ class ZoneDetailsScreen extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: () {
                     debugPrint('Navigate tapped');
-                    // You could close the sheet here
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
@@ -212,14 +208,9 @@ class ZoneDetailsScreen extends StatelessWidget {
                 height: 52,
                 child: ElevatedButton(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Parking confirmed! +20 points'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                    // And close the sheet
-                    Navigator.pop(context);
+                    // --- THIS IS THE CHANGE ---
+                    onParkHere(zone); // Call the function!
+                    // --- END OF CHANGE ---
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
@@ -237,7 +228,7 @@ class ZoneDetailsScreen extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 20), // Add padding at the bottom
+        const SizedBox(height: 20),
       ],
     );
   }

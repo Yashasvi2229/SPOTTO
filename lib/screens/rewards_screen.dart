@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+// Using Material icons for compatibility
 import '../data/mock_data.dart';
 
 class RewardsScreen extends StatelessWidget {
@@ -101,25 +101,25 @@ class RewardsScreen extends StatelessWidget {
                 context,
                 'Free Hour Parking',
                 '500 points',
-                PhosphorIcons.clock(),
+                Icons.access_time,
               ),
               _buildRewardCard(
                 context,
                 'Coffee Voucher',
                 '300 points',
-                PhosphorIcons.coffee(),
+                Icons.local_cafe,
               ),
               _buildRewardCard(
                 context,
                 'Premium Spot Access',
                 '1000 points',
-                PhosphorIcons.sparkle(),
+                Icons.auto_awesome,
               ),
               _buildRewardCard(
                 context,
                 'Gas Gift Card',
                 '800 points',
-                PhosphorIcons.gasPump(),
+                Icons.local_gas_station,
               ),
             ],
           ),

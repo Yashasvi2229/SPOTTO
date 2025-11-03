@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'screens/map_screen.dart';
 import 'screens/rewards_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/splash_screen.dart';
 
 void main() {
   runApp(const SpottoApp());
@@ -81,7 +82,10 @@ class SpottoApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const MainScreen(),
+      debugShowCheckedModeBanner: false,
+
+
+      home: const SplashScreen(),
     );
   }
 }

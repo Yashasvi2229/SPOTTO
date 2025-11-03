@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+// Use Material icons for reliable cross-version support
 import 'package:spotto/models/user_profile.dart';
 import '../data/mock_data.dart';
 
@@ -47,13 +47,13 @@ class ProfileScreen extends StatelessWidget {
               childAspectRatio: 1.8, // Make stats cards wider
               children: [
                 _buildStatCard(
-                  'Total Parks', '72', PhosphorIcons.pottedPlant(), Colors.green),
+                  'Total Parks', '72', Icons.local_parking, Colors.green),
                 _buildStatCard(
-                  'Reports Made', '18', PhosphorIcons.warningCircle(), Colors.orange),
+                  'Reports Made', '18', Icons.report_problem, Colors.orange),
                 _buildStatCard(
-                  'Eco Rank', '#12', PhosphorIcons.leaf(), spottoBlue),
+                  'Eco Rank', '#12', Icons.eco, spottoBlue),
                 _buildStatCard(
-                  'Avg. Time', '43 min', PhosphorIcons.timer(), Colors.purple),
+                  'Avg. Time', '43 min', Icons.timer, Colors.purple),
               ],
             ),
           ),
@@ -71,9 +71,9 @@ class ProfileScreen extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildActivityItem('Parked in Zone A', '+20 points', PhosphorIcons.pottedPlant(), Colors.green),
-                _buildActivityItem('Reported Zone C Full', '+5 points', PhosphorIcons.warning(), Colors.orange),
-                _buildActivityItem('Redeemed Coffee Voucher', '-300 points', PhosphorIcons.coffee(), Colors.brown),
+                _buildActivityItem('Parked in Zone A', '+20 points', Icons.local_parking, Colors.green),
+                _buildActivityItem('Reported Zone C Full', '+5 points', Icons.report_problem, Colors.orange),
+                _buildActivityItem('Redeemed Coffee Voucher', '-300 points', Icons.local_cafe, Colors.brown),
               ],
             ),
           ),
@@ -110,10 +110,10 @@ class ProfileScreen extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildSettingsItem('Edit Profile', PhosphorIcons.user()),
-                _buildSettingsItem('Notifications', PhosphorIcons.bell()),
-                _buildSettingsItem('Help & Support', PhosphorIcons.question()),
-                _buildSettingsItem('Logout', PhosphorIcons.signOut(), showArrow: false, color: Colors.red),
+                _buildSettingsItem('Edit Profile', Icons.person),
+                _buildSettingsItem('Notifications', Icons.notifications),
+                _buildSettingsItem('Help & Support', Icons.help_outline),
+                _buildSettingsItem('Logout', Icons.logout, showArrow: false, color: Colors.red),
               ],
             ),
           ),
@@ -157,7 +157,7 @@ class ProfileScreen extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(PhosphorIcons.star() ,color: Colors.yellow[400], size: 16),
+              Icon(Icons.star, color: Colors.yellow[400], size: 16),
               const SizedBox(width: 8),
               Text(
                 '${profile.points} points',
@@ -247,12 +247,12 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _buildBadgeCard(String badgeName, {bool isFirst = false}) {
     final icons = {
-      'Eco Parker': PhosphorIcons.leaf(),
-      'Early Bird': PhosphorIcons.sun(),
-      'Top Rated': PhosphorIcons.star(),
-      'Feedback Pro': PhosphorIcons.chatDots(PhosphorIconsStyle.fill),
-      'City Explorer': PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
-      'Weekend Warrior': PhosphorIcons.calendar(PhosphorIconsStyle.fill),
+      'Eco Parker': Icons.eco,
+      'Early Bird': Icons.wb_sunny,
+      'Top Rated': Icons.star,
+      'Feedback Pro': Icons.chat_bubble,
+      'City Explorer': Icons.place,
+      'Weekend Warrior': Icons.calendar_today,
     };
     final colors = {
       'Eco Parker': Colors.green,
@@ -275,7 +275,7 @@ class ProfileScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            icons[badgeName] ?? PhosphorIcons.question(),
+            icons[badgeName] ?? Icons.help_outline,
             color: colors[badgeName] ?? Colors.grey,
             size: 36,
           ),
@@ -311,9 +311,9 @@ class ProfileScreen extends StatelessWidget {
           color: color ?? Colors.black87,
         ),
       ),
-      trailing: showArrow
-          ? Icon(PhosphorIcons.caretRight(), color: Colors.grey[400], size: 16)
-          : null,
+    trailing: showArrow
+      ? Icon(Icons.chevron_right, color: Colors.grey[400], size: 16)
+      : null,
       onTap: () {},
     );
   }
