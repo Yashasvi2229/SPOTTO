@@ -63,7 +63,7 @@
     },
     {
       "name": "flutter",
-      "rootUri": "file:///Users/dakshjaitly/development/flutter/packages/flutter",
+      "rootUri": "file:///Users/dakshjaitly/flutter/packages/flutter",
       "packageUri": "lib/",
       "languageVersion": "3.8"
     },
@@ -81,7 +81,7 @@
     },
     {
       "name": "flutter_test",
-      "rootUri": "file:///Users/dakshjaitly/development/flutter/packages/flutter_test",
+      "rootUri": "file:///Users/dakshjaitly/flutter/packages/flutter_test",
       "packageUri": "lib/",
       "languageVersion": "3.8"
     },
@@ -218,6 +218,12 @@
       "languageVersion": "3.2"
     },
     {
+      "name": "phosphor_flutter",
+      "rootUri": "file:///Users/dakshjaitly/.pub-cache/hosted/pub.dev/phosphor_flutter-2.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "platform",
       "rootUri": "file:///Users/dakshjaitly/.pub-cache/hosted/pub.dev/platform-3.1.6",
       "packageUri": "lib/",
@@ -243,7 +249,7 @@
     },
     {
       "name": "sky_engine",
-      "rootUri": "file:///Users/dakshjaitly/development/flutter/bin/cache/pkg/sky_engine",
+      "rootUri": "file:///Users/dakshjaitly/flutter/bin/cache/pkg/sky_engine",
       "packageUri": "lib/",
       "languageVersion": "3.8"
     },
@@ -334,7 +340,7 @@
   ],
   "generator": "pub",
   "generatorVersion": "3.9.2",
-  "flutterRoot": "file:///Users/dakshjaitly/development/flutter",
+  "flutterRoot": "file:///Users/dakshjaitly/flutter",
   "flutterVersion": "3.35.7",
   "pubCache": "file:///Users/dakshjaitly/.pub-cache"
 }

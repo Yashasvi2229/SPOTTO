@@ -11,7 +11,8 @@
         "flutter",
         "flutter_map",
         "google_fonts",
-        "latlong2"
+        "latlong2",
+        "phosphor_flutter"
       ],
       "devDependencies": [
         "flutter_lints",
@@ -41,6 +42,13 @@
         "stream_channel",
         "test_api",
         "vector_math"
+      ]
+    },
+    {
+      "name": "phosphor_flutter",
+      "version": "2.1.0",
+      "dependencies": [
+        "flutter"
       ]
     },
     {

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../data/mock_data.dart';
 
 class RewardsScreen extends StatelessWidget {
@@ -7,11 +9,21 @@ class RewardsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final profile = mockUserProfile;
+    const Color spottoBlue = Color(0xFF0D6EFD); // Our theme blue
 
     return Scaffold(
+      // Use a modern, light grey background for depth
+      backgroundColor: Colors.grey[50], 
       appBar: AppBar(
-        title: const Text('Rewards'),
-        backgroundColor: Colors.white,
+        title: Text(
+          'Rewards',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
+            color: Colors.black,
+          ),
+        ),
+        backgroundColor: Colors.grey[50], // Match scaffold bg
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -20,64 +32,94 @@ class RewardsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Your Points',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '${profile.points}',
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      Icon(
-                        Icons.stars,
-                        size: 56,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+              // New Gradient-based Points Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24.0),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      spottoBlue.withOpacity(0.8),
+                      spottoBlue,
                     ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: spottoBlue.withOpacity(0.25),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    )
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Your Points',
+                      style: GoogleFonts.inter(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.star,
+                          color: Colors.yellow[400],
+                          size: 32,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '${profile.points}',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 28),
               Text(
                 'Available Rewards',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
+              // New unified reward cards
               _buildRewardCard(
+                context,
                 'Free Hour Parking',
                 '500 points',
-                Icons.local_parking,
-                Colors.blue,
+                PhosphorIcons.clock(),
               ),
               _buildRewardCard(
+                context,
                 'Coffee Voucher',
                 '300 points',
-                Icons.local_cafe,
-                Colors.brown,
+                PhosphorIcons.coffee(),
               ),
               _buildRewardCard(
+                context,
                 'Premium Spot Access',
                 '1000 points',
-                Icons.workspace_premium,
-                Colors.purple,
+                PhosphorIcons.sparkle(),
               ),
               _buildRewardCard(
+                context,
                 'Gas Gift Card',
                 '800 points',
-                Icons.local_gas_station,
-                Colors.red,
+                PhosphorIcons.gasPump(),
               ),
             ],
           ),
@@ -86,29 +128,76 @@ class RewardsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRewardCard(String title, String points, IconData icon, Color color) {
+  // New refactored widget for the reward card
+  Widget _buildRewardCard(
+      BuildContext context, String title, String points, IconData icon) {
+    const Color spottoBlue = Color(0xFF0D6EFD);
+    
+    // We use a Card that follows our global theme
     return Card(
-      elevation: 2,
+      elevation: 0, // Use border instead of shadow
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200, width: 1),
+      ),
       margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color.withOpacity(0.2),
-          child: Icon(icon, color: color),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: Text(points),
-        trailing: ElevatedButton(
-          onPressed: () {},
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Redeem'),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            // Icon in a light blue container
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: spottoBlue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: spottoBlue, size: 28),
+            ),
+            const SizedBox(width: 16),
+            // Title and points
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    points,
+                    style: GoogleFonts.inter(
+                      color: Colors.grey[600],
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Redeem Button
+            ElevatedButton(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: spottoBlue, // Always use theme blue
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(
+                'Redeem',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

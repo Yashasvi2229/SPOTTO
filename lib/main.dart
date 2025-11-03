@@ -8,47 +8,76 @@ void main() {
   runApp(const SpottoApp());
 }
 
+const Color spottoBlue = Color(0xFF0D6EFD); // This is a clean, standard blue
+const Color spottoLightGrey = Color(0xFFF8F9FA); // Off-white for backgrounds
+const Color spottoGrey = Color(0xFF6C757D); // For text
+
 class SpottoApp extends StatelessWidget {
   const SpottoApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     final base = ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: spottoBlue,
+        background: Colors.white,
+        primary: spottoBlue,
+      ),
       useMaterial3: true,
-      textTheme: GoogleFonts.interTextTheme(),
-      scaffoldBackgroundColor: Colors.white,
+      scaffoldBackgroundColor: Colors.white, // White background
+      textTheme: GoogleFonts.interTextTheme(), // Use "Inter" font everywhere
     );
 
     return MaterialApp(
       title: 'Spotto',
       theme: base.copyWith(
+        // Clean, flat AppBars
         appBarTheme: base.appBarTheme.copyWith(
           backgroundColor: Colors.white,
           elevation: 0,
-          foregroundColor: Colors.black87,
-          centerTitle: false,
+          foregroundColor: Colors.black,
+          titleTextStyle: GoogleFonts.inter(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
+          ),
         ),
+        
+        // This is for ALL rounded boxes
         cardTheme: base.cardTheme.copyWith(
-          elevation: 2,
+          elevation: 0, // No shadows
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
+            // Add a subtle border like the mockups
+            side: BorderSide(color: Colors.grey.shade200, width: 1),
           ),
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         ),
+
+        // This is for ALL buttons
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
+            backgroundColor: spottoBlue,
+            foregroundColor: Colors.white,
             elevation: 0,
+            textStyle: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
+            padding: const EdgeInsets.symmetric(vertical: 16),
           ),
         ),
-        floatingActionButtonTheme: base.floatingActionButtonTheme.copyWith(
-          elevation: 4,
-          backgroundColor: base.colorScheme.primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+
+        // Clean up the Bottom Nav Bar
+        navigationBarTheme: base.navigationBarTheme.copyWith(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          indicatorColor: spottoBlue.withOpacity(0.1), // The pill shape
+          labelTextStyle: MaterialStateProperty.all(
+            GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
           ),
         ),
       ),

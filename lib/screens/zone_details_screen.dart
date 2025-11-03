@@ -5,10 +5,12 @@ import '../data/mock_data.dart';
 
 class ZoneDetailsScreen extends StatelessWidget {
   final ParkingZone zone;
+  final ScrollController? scrollController; // <-- ADD THIS
 
   const ZoneDetailsScreen({
     super.key,
     required this.zone,
+    this.scrollController, // <-- AND THIS
   });
 
   @override
@@ -16,202 +18,227 @@ class ZoneDetailsScreen extends StatelessWidget {
     final details = mockZoneDetails[zone.id];
 
     if (details == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(zone.name),
-        ),
-        body: const Center(
+      // Return a container, as it's inside a sheet
+      return Container(
+        padding: const EdgeInsets.all(24),
+        child: const Center(
           child: Text('Zone details not found'),
         ),
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(zone.name),
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(18.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildStatCard(
-                          'Availability',
-                          '${(zone.probability * 100).toStringAsFixed(0)}%',
-                          Icons.local_parking,
-                          _getAvailabilityColor(zone.probability),
+    // We no longer need a Scaffold. We're in a sheet.
+    // Replace SingleChildScrollView with ListView
+    return ListView(
+      controller: scrollController, // <-- USE THE CONTROLLER
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      children: [
+        // This is a "grabber" handle for the sheet
+        Center(
+          child: Container(
+            width: 40,
+            height: 5,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        ),
+        // Add the zone name as a title
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: Text(
+            zone.name,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildStatCard(
+                    'Availability',
+                    '${(zone.probability * 100).toStringAsFixed(0)}%',
+                    Icons.local_parking,
+                    _getAvailabilityColor(zone.probability),
+                  ),
+                  _buildStatCard(
+                    'Last Updated',
+                    details.lastUpdated,
+                    Icons.access_time,
+                    Theme.of(context).colorScheme.primary,
+                  ),
+                  _buildStatCard(
+                    'Avg',
+                    details.avgParkingTime,
+                    Icons.timer,
+                    Theme.of(context).colorScheme.primary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Probability of Spot by Time',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 200,
+                    child: LineChart(
+                      LineChartData(
+                        gridData: const FlGridData(
+                          show: true,
+                          drawVerticalLine: true,
+                          horizontalInterval: 0.2,
+                          verticalInterval: 1,
                         ),
-                        _buildStatCard(
-                          'Last Updated',
-                          details.lastUpdated,
-                          Icons.access_time,
-                          Theme.of(context).colorScheme.primary,
+                        titlesData: FlTitlesData(
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 40,
+                              getTitlesWidget: (value, meta) {
+                                return Text(
+                                  '${(value * 100).toInt()}%',
+                                  style: const TextStyle(fontSize: 12),
+                                );
+                              },
+                            ),
+                          ),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 30,
+                              getTitlesWidget: (value, meta) {
+                                return Text(
+                                  '${value.toInt()}h',
+                                  style: const TextStyle(fontSize: 12),
+                                );
+                              },
+                            ),
+                          ),
+                          topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
                         ),
-                        _buildStatCard(
-                          'Avg',
-                          details.avgParkingTime,
-                          Icons.timer,
-                          Theme.of(context).colorScheme.primary,
+                        borderData: FlBorderData(
+                          show: true,
+                          border: Border.all(color: Colors.grey.shade200),
                         ),
-                      ],
+                        minX: 0,
+                        maxX: 5,
+                        minY: 0,
+                        maxY: 1,
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: details.probabilityHistory,
+                            isCurved: true,
+                            color: Theme.of(context).colorScheme.primary,
+                            barWidth: 3,
+                            dotData: const FlDotData(show: false),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withOpacity(0.15),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () {
+                    debugPrint('Navigate tapped');
+                    // You could close the sheet here
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Navigate',
+                    style: TextStyle(fontSize: 16),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Probability of Spot by Time',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 200,
-                          child: LineChart(
-                            LineChartData(
-                              gridData: const FlGridData(
-                                show: true,
-                                drawVerticalLine: true,
-                                horizontalInterval: 0.2,
-                                verticalInterval: 1,
-                              ),
-                              titlesData: FlTitlesData(
-                                leftTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    reservedSize: 40,
-                                    getTitlesWidget: (value, meta) {
-                                      return Text(
-                                        '${(value * 100).toInt()}%',
-                                        style: const TextStyle(fontSize: 12),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                bottomTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    reservedSize: 30,
-                                    getTitlesWidget: (value, meta) {
-                                      return Text(
-                                        '${value.toInt()}h',
-                                        style: const TextStyle(fontSize: 12),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                topTitles: const AxisTitles(
-                                  sideTitles: SideTitles(showTitles: false),
-                                ),
-                                rightTitles: const AxisTitles(
-                                  sideTitles: SideTitles(showTitles: false),
-                                ),
-                              ),
-                              borderData: FlBorderData(
-                                show: true,
-                                    border: Border.all(color: Colors.grey.shade200),
-                              ),
-                              minX: 0,
-                              maxX: 5,
-                              minY: 0,
-                              maxY: 1,
-                              lineBarsData: [
-                                LineChartBarData(
-                                  spots: details.probabilityHistory,
-                                  isCurved: true,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  barWidth: 3,
-                                  dotData: const FlDotData(show: false),
-                                  belowBarData: BarAreaData(
-                                    show: true,
-                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Parking confirmed! +20 points'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                    // And close the sheet
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          debugPrint('Navigate tapped');
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Navigate',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Parking confirmed! +20 points'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'I Parked Here',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
+                  child: const Text(
+                    'I Parked Here',
+                    style: TextStyle(fontSize: 16),
+                  ),
                 ),
               ),
             ],
           ),
         ),
-      ),
+        const SizedBox(height: 20), // Add padding at the bottom
+      ],
     );
   }
 
