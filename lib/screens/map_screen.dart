@@ -19,7 +19,7 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
-  late List<ParkingZone> zones;
+  List<ParkingZone> zones = []; // Start with empty list
   Timer? _simulationTimer;
   final Random _random = Random();
   late MapController _mapController;
@@ -28,6 +28,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   bool _locationFetched = false;
   String _currentPlacename = "Locating...";
   bool _isLocating = false; // <--- NEW: To prevent multiple requests
+  bool _isLoadingZones = false; // Track if zones are being fetched
 
   StreamSubscription<ServiceStatus>? _gpsServiceSubscription;
   StreamSubscription<Position>? _positionStreamSubscription; // <--- NEW: For location stream
@@ -40,9 +41,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    zones = List.from(mockParkingZones);
     _mapController = MapController();
-    _startLiveSimulation();
+    // Don't start simulation or load zones yet - wait for location
 
     // Listen for GPS service status (e.g., user turning it on/off)
     _gpsServiceSubscription = Geolocator.getServiceStatusStream().listen(
@@ -50,10 +50,21 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           if (status == ServiceStatus.enabled) {
             _determinePosition(); // GPS was just turned on, try to get location
           } else {
-            setState(() {
-              _locationFetched = false;
-              _currentPlacename = "Please enable GPS";
-            });
+            // GPS was turned off - reset everything
+            _positionStreamSubscription?.cancel();
+            _simulationTimer?.cancel();
+            if (mounted) {
+              setState(() {
+                zones = []; // Clear all zones
+                _locationFetched = false;
+                _isLocating = false;
+                _isLoadingZones = false;
+                _currentPlacename = "Please enable GPS to fetch zones";
+                // Reset to default location
+                _userLocation = const LatLng(18.604792, 73.716666);
+                _mapController.move(_userLocation, 18.0);
+              });
+            }
           }
         }
     );
@@ -97,8 +108,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (mounted) {
-        setState(() => _currentPlacename = "Please enable GPS");
+        setState(() {
+          _currentPlacename = "Please enable GPS";
+          _locationFetched = true; // Still allow zones to show
+        });
         _showEnableGpsDialog();
+        // Load zones anyway after a delay (for testing/fallback)
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) _fetchParkingZones();
+        });
       }
       return;
     }
@@ -108,7 +126,16 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        if (mounted) setState(() => _currentPlacename = "Location permission denied");
+        if (mounted) {
+          setState(() {
+            _currentPlacename = "Location permission denied";
+            _locationFetched = true; // Still allow zones to show
+          });
+          // Load zones anyway after a delay (for testing/fallback)
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) _fetchParkingZones();
+          });
+        }
         return;
       }
     }
@@ -138,9 +165,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         onTimeout: (sink) {
           if (mounted) {
             setState(() {
-              _currentPlacename = "Location timeout. Try again.";
+              _currentPlacename = "Location timeout. Using default location.";
               _isLocating = false;
+              // Still mark as fetched so we can show zones
+              _locationFetched = true;
             });
+            // Load zones even if location timed out
+            _fetchParkingZones();
           }
           sink.close();
         }
@@ -171,23 +202,86 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               _isLocating = false; // We are done
               _mapController.move(_userLocation, 18.0);
             });
+            // Now that location is found, fetch parking zones
+            _fetchParkingZones();
           }
         },
         onError: (error) {
           if (mounted) {
             setState(() {
-              _currentPlacename = "Error finding location";
+              _currentPlacename = "Error finding location. Using default location.";
               _isLocating = false;
+              // Still mark as fetched so we can show zones
+              _locationFetched = true;
             });
+            // Load zones even if location failed
+            _fetchParkingZones();
           }
         }
     );
   }
   // --- END REWRITTEN LOGIC ---
 
+  // Simulated network request to fetch parking zones
+  Future<void> _fetchParkingZones() async {
+    if (_isLoadingZones) return; // Prevent multiple simultaneous requests
+
+    setState(() {
+      _isLoadingZones = true;
+    });
+
+    // Simulate network delay (1-2 seconds)
+    await Future.delayed(Duration(milliseconds: 1500 + _random.nextInt(500)));
+
+    if (mounted) {
+      setState(() {
+        // Calculate zones relative to current user location
+        zones = _generateZonesRelativeToLocation(_userLocation);
+        _isLoadingZones = false;
+      });
+      // Center map on zones if location wasn't fetched (use default location)
+      if (!_locationFetched) {
+        _mapController.move(_userLocation, 18.0);
+      }
+      // Start the simulation timer now that we have zones
+      _startLiveSimulation();
+    }
+  }
+
+  // Generate parking zones relative to the user's current location
+  List<ParkingZone> _generateZonesRelativeToLocation(LatLng userLocation) {
+    // Original center point (Pune coordinates where zones were originally defined)
+    const LatLng originalCenter = LatLng(18.604792, 73.716666);
+    
+    // Calculate offset from original center to user's location
+    final double latOffset = userLocation.latitude - originalCenter.latitude;
+    final double lngOffset = userLocation.longitude - originalCenter.longitude;
+    
+    // Create zones by applying the offset to each boundary point
+    return mockParkingZones.map((originalZone) {
+      final List<LatLng> adjustedBoundaries = originalZone.boundaries.map((point) {
+        return LatLng(
+          point.latitude + latOffset,
+          point.longitude + lngOffset,
+        );
+      }).toList();
+      
+      return ParkingZone(
+        id: originalZone.id,
+        name: originalZone.name,
+        boundaries: adjustedBoundaries,
+        probability: originalZone.probability,
+      );
+    }).toList();
+  }
+
   void _startLiveSimulation() {
+    // Only start simulation if we have zones loaded
+    if (zones.isEmpty) return;
+
+    _simulationTimer?.cancel(); // Cancel any existing timer
     _simulationTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (!mounted) {
+      if (!mounted || zones.isEmpty) {
         timer.cancel();
         return;
       }
@@ -311,7 +405,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               initialCenter: _userLocation,
               initialZoom: 18.0,
               onTap: (tapPos, latlng) {
-                if (!_isParked) {
+                if (!_isParked && zones.isNotEmpty) {
                   for (final zone in zones) {
                     if (_pointInPolygon(latlng, zone.boundaries)) {
                       _onZoneTap(zone);
@@ -329,21 +423,22 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 userAgentPackageName: 'com.example.spotto',
                 retinaMode: true,
               ),
-              PolygonLayer(
-                polygons: zones.map((zone) {
-                  final baseColor = _getZoneColor(zone.probability);
-                  return Polygon(
-                    points: zone.boundaries,
-                    color: _isParked
-                        ? baseColor.withOpacity(0.1)
-                        : baseColor.withOpacity(0.20),
-                    borderColor: _isParked
-                        ? baseColor.withOpacity(0.3)
-                        : baseColor.withOpacity(0.85),
-                    borderStrokeWidth: 3.0,
-                  );
-                }).toList(),
-              ),
+              if (zones.isNotEmpty)
+                PolygonLayer(
+                  polygons: zones.map((zone) {
+                    final baseColor = _getZoneColor(zone.probability);
+                    return Polygon(
+                      points: zone.boundaries,
+                      color: _isParked
+                          ? baseColor.withOpacity(0.1)
+                          : baseColor.withOpacity(0.20),
+                      borderColor: _isParked
+                          ? baseColor.withOpacity(0.3)
+                          : baseColor.withOpacity(0.85),
+                      borderStrokeWidth: 3.0,
+                    );
+                  }).toList(),
+                ),
 
               MarkerLayer(
                 markers: [
@@ -369,7 +464,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 ],
               ),
 
-              if (!_isParked)
+              if (!_isParked && zones.isNotEmpty)
                 MarkerLayer(
                   markers: zones.map((zone) {
                     final centroid = _centroid(zone.boundaries);
@@ -587,7 +682,59 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       ?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),
-              ...zones.map((zone) => _buildZoneListItem(zone)),
+              if (_isLoadingZones)
+                Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Loading parking zones...',
+                          style: GoogleFonts.inter(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (zones.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.location_off,
+                          size: 48,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No zones found',
+                          style: GoogleFonts.inter(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Waiting for location...',
+                          style: GoogleFonts.inter(
+                            color: Colors.grey[500],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ...zones.map((zone) => _buildZoneListItem(zone)),
             ],
           ),
         );
