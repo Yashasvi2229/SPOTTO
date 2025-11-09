@@ -10,6 +10,7 @@ class ZoneDetailsScreen extends StatelessWidget {
   final ScrollController? scrollController;
   final void Function(ParkingZone) onParkHere;
   final LatLng? userLocation; // User's current location for navigation
+  final void Function(ParkingZone) onNavigateExternal; // Callback when external navigation starts
 
   const ZoneDetailsScreen({
     super.key,
@@ -17,6 +18,7 @@ class ZoneDetailsScreen extends StatelessWidget {
     this.scrollController,
     required this.onParkHere,
     this.userLocation, // Optional user location
+    required this.onNavigateExternal, // Required callback
   });
 
   @override
@@ -199,6 +201,9 @@ class ZoneDetailsScreen extends StatelessWidget {
                       destination,
                       userLocation, // Pass user's current location as origin
                     );
+                    
+                    // Inform MapScreen that external navigation has started for this zone
+                    onNavigateExternal(zone);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,

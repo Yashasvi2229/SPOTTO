@@ -10,6 +10,7 @@ import '../data/mock_data.dart';
 import '../models/parking_zone.dart';
 import '../models/search_suggestion.dart';
 import 'zone_details_screen.dart';
+import 'total_fare_screen.dart';
 
 
 class MapScreen extends StatefulWidget {
@@ -19,7 +20,7 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
+class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   List<ParkingZone> zones = []; // Start with empty list
   Timer? _simulationTimer;
   final Random _random = Random();
@@ -57,10 +58,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   
   // Track current zoom level
   double _currentZoom = 18.0;
+  
+  // Track external navigation state
+  bool _isNavigatingExternally = false;
+  ParkingZone? _zoneToParkAfterNavigation;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // Add lifecycle observer
     _mapController = MapController();
     // Store the initial default location as original location
     _originalLocation = _userLocation;
@@ -308,29 +314,73 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   // Generate parking zones relative to the user's current location
   List<ParkingZone> _generateZonesRelativeToLocation(LatLng userLocation) {
-    // Original center point (Pune coordinates where zones were originally defined)
-    const LatLng originalCenter = LatLng(18.604792, 73.716666);
+    // Navi Mumbai coordinates (where Mumbai Private Zone should appear)
+    const LatLng naviMumbaiCenter = LatLng(19.030826, 73.019854);
+    final double distanceToNaviMumbai = _calculateDistance(userLocation, naviMumbaiCenter);
+    final bool isNearNaviMumbai = distanceToNaviMumbai < 5.0; // 5km radius
     
-    // Calculate offset from original center to user's location
-    final double latOffset = userLocation.latitude - originalCenter.latitude;
-    final double lngOffset = userLocation.longitude - originalCenter.longitude;
-    
-    // Create zones by applying the offset to each boundary point
-    return mockParkingZones.map((originalZone) {
-      final List<LatLng> adjustedBoundaries = originalZone.boundaries.map((point) {
-        return LatLng(
-          point.latitude + latOffset,
-          point.longitude + lngOffset,
+    // If user is near Navi Mumbai, show ONLY the Mumbai Private Zone
+    // Otherwise, show the regular public zones (shifted relative to location)
+    if (isNearNaviMumbai) {
+      // Only show Mumbai Private Zone when near Navi Mumbai
+      final mumbaiZone = mockParkingZones.firstWhere(
+        (zone) => zone.id == 'zone_mumbai_private',
+        orElse: () => throw StateError('Mumbai zone not found'),
+      );
+      return [
+        ParkingZone(
+          id: mumbaiZone.id,
+          name: mumbaiZone.name,
+          boundaries: mumbaiZone.boundaries, // Use fixed coordinates
+          probability: mumbaiZone.probability,
+          isPrivate: mumbaiZone.isPrivate,
+          hourlyRate: mumbaiZone.hourlyRate,
+        ),
+      ];
+    } else {
+      // Show regular public zones (shifted relative to user location)
+      // Original center point (Pune coordinates where zones were originally defined)
+      const LatLng originalCenter = LatLng(18.604792, 73.716666);
+      
+      // Calculate offset from original center to user's location
+      final double latOffset = userLocation.latitude - originalCenter.latitude;
+      final double lngOffset = userLocation.longitude - originalCenter.longitude;
+      
+      // Return all zones EXCEPT Mumbai zone, shifted relative to location
+      return mockParkingZones.where((zone) => zone.id != 'zone_mumbai_private').map((originalZone) {
+        final List<LatLng> adjustedBoundaries = originalZone.boundaries.map((point) {
+          return LatLng(
+            point.latitude + latOffset,
+            point.longitude + lngOffset,
+          );
+        }).toList();
+        
+        return ParkingZone(
+          id: originalZone.id,
+          name: originalZone.name,
+          boundaries: adjustedBoundaries,
+          probability: originalZone.probability,
+          isPrivate: originalZone.isPrivate,
+          hourlyRate: originalZone.hourlyRate,
         );
       }).toList();
-      
-      return ParkingZone(
-        id: originalZone.id,
-        name: originalZone.name,
-        boundaries: adjustedBoundaries,
-        probability: originalZone.probability,
-      );
-    }).toList();
+    }
+  }
+  
+  // Helper to calculate distance between two coordinates in kilometers
+  double _calculateDistance(LatLng point1, LatLng point2) {
+    const double earthRadius = 6371; // km
+    final double dLat = _toRadians(point2.latitude - point1.latitude);
+    final double dLon = _toRadians(point2.longitude - point1.longitude);
+    final double a = (dLat / 2) * (dLat / 2) +
+        _toRadians(point1.latitude) * _toRadians(point2.latitude) *
+        (dLon / 2) * (dLon / 2);
+    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadius * c;
+  }
+  
+  double _toRadians(double degrees) {
+    return degrees * (pi / 180);
   }
 
   void _startLiveSimulation() {
@@ -375,7 +425,25 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // App has returned to the foreground
+      if (_isNavigatingExternally && _zoneToParkAfterNavigation != null) {
+        setState(() {
+          _isNavigatingExternally = false; // Reset flag
+        });
+        // Show the "Have you parked?" dialog for the zone we were navigating to
+        final zone = _zoneToParkAfterNavigation;
+        _zoneToParkAfterNavigation = null; // Clear the zone
+        if (zone != null && mounted) {
+          _showParkConfirmationDialog(context, zone);
+        }
+      }
+    }
+  }
+
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // Remove lifecycle observer
     _gpsServiceSubscription?.cancel();
     _positionStreamSubscription?.cancel(); // <--- NEW: Cancel position stream
     _simulationTimer?.cancel();
@@ -526,6 +594,39 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     _mapController.move(_mapController.camera.center, newZoom);
   }
 
+  Future<void> _showParkConfirmationDialog(BuildContext context, ParkingZone zone) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Have you parked?'),
+          content: const Text('Confirm that you have parked at this location.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Not yet'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                // Call _parkInZone to activate parking
+                _parkInZone(zone);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _goBackToOriginalLocation() {
     if (_originalLocation == null || _originalPlacename == null) return;
     
@@ -570,6 +671,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 scrollController: scrollController,
                 onParkHere: _parkInZone,
                 userLocation: _locationFetched ? _userLocation : null,
+                onNavigateExternal: (navigatedZone) {
+                  // Track that external navigation has started for this zone
+                  setState(() {
+                    _isNavigatingExternally = true;
+                    _zoneToParkAfterNavigation = navigatedZone;
+                  });
+                },
               ),
             );
           },
@@ -594,15 +702,58 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   void _leaveZone() {
+    // Store the zone and duration before clearing them
+    final zone = _parkedZone;
+    final wasPrivate = zone?.isPrivate ?? false;
+    final parkingDuration = _parkingDuration; // Store before clearing
+    
+    // Always show rewards popup first
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.celebration, color: Colors.white),
+            SizedBox(width: 8),
+            Text('+20 rewards points! 🔥'),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 2),
+      ),
+    );
+    
+    // Clear parking state
     setState(() {
       _isParked = false;
       _parkedZone = null;
     });
     _parkingTimer?.cancel();
     _parkingDuration = Duration.zero;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Parking session ended.')),
-    );
+    
+    // Conditional payment flow
+    if (wasPrivate && zone != null) {
+      // Calculate total fare based on parking duration
+      // Rate is ₹1 per minute
+      final totalFare = parkingDuration.inMinutes; // ₹1 per minute
+      
+      // Navigate to Total Fare screen
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TotalFareScreen(
+                zoneName: zone.name,
+                parkingDuration: parkingDuration,
+                ratePerMinute: 1.0, // ₹1 per minute
+                totalFare: totalFare,
+              ),
+            ),
+          );
+        }
+      });
+    }
+    // If public zone, just return to map (already done by clearing state)
   }
 
   @override
@@ -1425,7 +1576,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   "Time",
                   _formatDuration(_parkingDuration),
                 ),
-                _buildStatColumn("Rate", "\$2.50/hr"), // UNTOUCHED (Mock data)
+                // Show rate only if zone is private
+                if (_parkedZone!.isPrivate)
+                  _buildStatColumn("Rate", _parkedZone!.hourlyRate)
+                else
+                  _buildStatColumn("Type", "Free"),
                 _buildStatColumn("Points", "+20"), // Mock data
               ],
             ),

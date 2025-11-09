@@ -21,6 +21,8 @@ final List<ParkingZone> mockParkingZones = [
       const LatLng(18.605556, 73.716389), // Closing the loop
     ],
     probability: 0.35, // Let's make it somewhat full
+    isPrivate: false, // Public zone
+    hourlyRate: "Free",
   ),
   ParkingZone(
     id: 'zone_b',
@@ -33,6 +35,8 @@ final List<ParkingZone> mockParkingZones = [
       const LatLng(18.605556, 73.71728),
     ],
     probability: 0.75,
+    isPrivate: false, // Public zone
+    hourlyRate: "Free",
   ),
   ParkingZone(
     id: 'zone_c',
@@ -45,6 +49,8 @@ final List<ParkingZone> mockParkingZones = [
       const LatLng(18.603611, 73.716944),
     ],
     probability: 0.90, // High chance
+    isPrivate: false, // Public zone
+    hourlyRate: "Free",
   ),
   ParkingZone(
     id: 'zone_d',
@@ -57,6 +63,24 @@ final List<ParkingZone> mockParkingZones = [
       const LatLng(18.605556, 73.71580),
     ],
     probability: 0.15, // Super full
+    isPrivate: false, // Public zone
+    hourlyRate: "Free",
+  ),
+  // Mumbai Private Zone - Large paid parking lot
+  ParkingZone(
+    id: 'zone_mumbai_private',
+    name: 'Mumbai Private Zone',
+    boundaries: [
+      // Large zone in Navi Mumbai, Thane area (around 19.030826, 73.019854)
+      const LatLng(19.035, 73.015), // Northwest
+      const LatLng(19.035, 73.025), // Northeast
+      const LatLng(19.025, 73.025), // Southeast
+      const LatLng(19.025, 73.015), // Southwest
+      const LatLng(19.035, 73.015), // Closing the loop
+    ],
+    probability: 0.60,
+    isPrivate: true, // Private paid zone
+    hourlyRate: "₹1/min",
   ),
 ];
 
@@ -108,6 +132,18 @@ final Map<String, ZoneDetails> mockZoneDetails = {
       const FlSpot(3, 0.2),
       const FlSpot(4, 0.15),
       const FlSpot(5, 0.15),
+    ],
+  ),
+  'zone_mumbai_private': ZoneDetails(
+    avgParkingTime: '120 min',
+    lastUpdated: '1 min ago',
+    probabilityHistory: [
+      const FlSpot(0, 0.55),
+      const FlSpot(1, 0.60),
+      const FlSpot(2, 0.65),
+      const FlSpot(3, 0.60),
+      const FlSpot(4, 0.58),
+      const FlSpot(5, 0.60),
     ],
   ),
 };
