@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
@@ -66,49 +67,62 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this); // Add lifecycle observer
-    _mapController = MapController();
-    // Store the initial default location as original location
-    _originalLocation = _userLocation;
-    _originalPlacename = _currentPlacename;
-    // Initialize bottom sheet height to initial size (25% of screen)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final screenHeight = MediaQuery.of(context).size.height;
-        setState(() {
-          _bottomSheetHeight = screenHeight * 0.25;
-        });
-      }
-    });
-    // Don't start simulation or load zones yet - wait for location
-
-    // Listen for GPS service status (e.g., user turning it on/off)
-    _gpsServiceSubscription = Geolocator.getServiceStatusStream().listen(
-            (ServiceStatus status) {
-          if (status == ServiceStatus.enabled) {
-            _determinePosition(); // GPS was just turned on, try to get location
-          } else {
-            // GPS was turned off - reset everything
-            _positionStreamSubscription?.cancel();
-            _simulationTimer?.cancel();
-            if (mounted) {
-              setState(() {
-                zones = []; // Clear all zones
-                _locationFetched = false;
-                _isLocating = false;
-                _isLoadingZones = false;
-                _currentPlacename = "Please enable GPS to fetch zones";
-                // Reset to default location
-                _userLocation = const LatLng(18.604792, 73.716666);
-                _currentZoom = 18.0;
-                _mapController.move(_userLocation, _currentZoom);
-              });
-            }
+    try {
+      WidgetsBinding.instance.addObserver(this); // Add lifecycle observer
+      _mapController = MapController();
+      // Store the initial default location as original location
+      _originalLocation = _userLocation;
+      _originalPlacename = _currentPlacename;
+      // Initialize bottom sheet height to initial size (25% of screen)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          try {
+            final screenHeight = MediaQuery.of(context).size.height;
+            setState(() {
+              _bottomSheetHeight = screenHeight * 0.25;
+            });
+          } catch (e) {
+            debugPrint('Error in postFrameCallback: $e');
           }
         }
-    );
-    // Also run the check once on init
-    _determinePosition();
+      });
+      // Don't start simulation or load zones yet - wait for location
+
+      // On web, try to get location but don't use service status stream (not supported on web)
+      if (kIsWeb) {
+        // On web, directly try to get location
+        _determinePosition();
+      } else {
+        // Listen for GPS service status (e.g., user turning it on/off)
+        _gpsServiceSubscription = Geolocator.getServiceStatusStream().listen(
+                (ServiceStatus status) {
+              if (status == ServiceStatus.enabled) {
+                _determinePosition(); // GPS was just turned on, try to get location
+              } else {
+                // GPS was turned off - reset everything
+                _positionStreamSubscription?.cancel();
+                _simulationTimer?.cancel();
+                if (mounted) {
+                  setState(() {
+                    zones = []; // Clear all zones
+                    _locationFetched = false;
+                    _isLocating = false;
+                    _isLoadingZones = false;
+                    _currentPlacename = "Please enable GPS to fetch zones";
+                    // Reset to default location
+                    _userLocation = const LatLng(18.604792, 73.716666);
+                    _currentZoom = 18.0;
+                    _mapController.move(_userLocation, _currentZoom);
+                  });
+                }
+              }
+            }
+        );
+        _determinePosition();
+      }
+    } catch (e) {
+      debugPrint('Error in initState: $e');
+    }
   }
 
   Future<void> _showEnableGpsDialog() async {
@@ -143,6 +157,111 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
   // --- COMPLETELY REWRITTEN LOCATION LOGIC ---
   Future<void> _determinePosition() async {
+    // On web, handle location differently
+    if (kIsWeb) {
+      // Prevent multiple requests
+      if (_isLocating) return;
+
+      if (mounted) {
+        setState(() {
+          _isLocating = true;
+          _currentPlacename = "Locating...";
+        });
+      }
+
+      try {
+        // On web, skip service check and go straight to permission
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        
+        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+          if (mounted) {
+            setState(() {
+              _currentPlacename = "Location permission denied";
+              _locationFetched = true;
+              _isLocating = false;
+            });
+            _fetchParkingZones();
+          }
+          return;
+        }
+
+        // Get current position
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 10),
+        );
+        
+        // Get address from coordinates
+        try {
+          List<Placemark> placemarks = await placemarkFromCoordinates(
+            position.latitude,
+            position.longitude,
+          );
+          
+          String address = placemarks.isNotEmpty
+              ? '${placemarks.first.street ?? ''}, ${placemarks.first.locality ?? ''}, ${placemarks.first.administrativeArea ?? ''}'
+              : '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+          
+          if (address.trim().isEmpty || address.trim() == ',') {
+            address = '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+          }
+
+          if (mounted) {
+            setState(() {
+              _userLocation = LatLng(position.latitude, position.longitude);
+              _locationFetched = true;
+              _currentPlacename = address;
+              _isLocating = false;
+              _currentZoom = 18.0;
+              _mapController.move(_userLocation, _currentZoom);
+              
+              // Update original location with the actual GPS location
+              _originalLocation = _userLocation;
+              _originalPlacename = address;
+            });
+            // Now that location is found, fetch parking zones
+            _fetchParkingZones();
+          }
+        } catch (geocodeError) {
+          // If geocoding fails, still use the coordinates
+          String address = '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+          if (mounted) {
+            setState(() {
+              _userLocation = LatLng(position.latitude, position.longitude);
+              _locationFetched = true;
+              _currentPlacename = address;
+              _isLocating = false;
+              _currentZoom = 18.0;
+              _mapController.move(_userLocation, _currentZoom);
+              _originalLocation = _userLocation;
+              _originalPlacename = address;
+            });
+            _fetchParkingZones();
+          }
+        }
+      } catch (error) {
+        debugPrint('Location error: $error');
+        if (mounted) {
+          setState(() {
+            _currentPlacename = "Error finding location. Using default location.";
+            _isLocating = false;
+            _locationFetched = true;
+            
+            if (_originalLocation == null) {
+              _originalLocation = _userLocation;
+              _originalPlacename = _currentPlacename;
+            }
+          });
+          _fetchParkingZones();
+        }
+      }
+      return;
+    }
+
+    // Mobile location logic
     // 1. Check if GPS service is enabled
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -198,7 +317,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     // 4. Cancel any old stream
     await _positionStreamSubscription?.cancel();
 
-    // 5. Start a new location stream
+    // 5. Start a new location stream (for mobile)
     _positionStreamSubscription = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -442,6 +561,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     }
   }
 
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this); // Remove lifecycle observer
     _gpsServiceSubscription?.cancel();
@@ -761,30 +881,58 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     return Scaffold(
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _userLocation,
-              initialZoom: 18.0,
-              onTap: (tapPos, latlng) {
-                if (!_isParked && zones.isNotEmpty) {
-                  for (final zone in zones) {
-                    if (_pointInPolygon(latlng, zone.boundaries)) {
-                      _onZoneTap(zone);
-                      return;
+          // Simple background first
+          Container(
+            color: Colors.blue[50],
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.map, size: 64, color: Colors.blue[300]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Map Loading...',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.blue[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Map widget
+          Positioned.fill(
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _userLocation,
+                initialZoom: 18.0,
+                minZoom: 3,
+                maxZoom: 19,
+                onTap: (tapPos, latlng) {
+                  if (!_isParked && zones.isNotEmpty) {
+                    for (final zone in zones) {
+                      if (_pointInPolygon(latlng, zone.boundaries)) {
+                        _onZoneTap(zone);
+                        return;
+                      }
                     }
                   }
-                }
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                userAgentPackageName: 'com.example.spotto',
-                retinaMode: true,
+                },
               ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  subdomains: const ['a', 'b', 'c'],
+                  userAgentPackageName: 'com.example.spotto',
+                  maxZoom: 19,
+                  minZoom: 3,
+                  errorTileCallback: (tile, error, stackTrace) {
+                    debugPrint('Tile error: $error');
+                  },
+                ),
               if (zones.isNotEmpty)
                 PolygonLayer(
                   polygons: zones.map((zone) {
@@ -871,10 +1019,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                     );
                   }).toList(),
                 ),
-            ],
+              ],
+            ),
           ),
 
-          // --- CONDITIONAL UI ---
+              // --- CONDITIONAL UI ---
           if (_isParked)
             _buildActiveParkingCard()
           else
@@ -1133,6 +1282,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         initialChildSize: 0.25,
         minChildSize: 0.1,
         maxChildSize: 0.8,
+        snap: true,
+        snapSizes: const [0.25, 0.5, 0.8],
         builder: (_, scrollController) {
           return Container(
           decoration: BoxDecoration(
@@ -1150,8 +1301,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
           ),
           child: ListView(
             controller: scrollController,
+            physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.all(0),
             children: [
+              // Drag handle
               Center(
                 child: Container(
                   width: 40,
@@ -1287,11 +1440,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                 )
               else
                 ...zones.map((zone) => _buildZoneListItem(zone)),
-              ],
-            ),
-          );
-        },
-      ),
+            ],
+          ),
+        );
+      },
+    ),
     );
   }
 
