@@ -773,41 +773,32 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return Stack(
-            children: [
-              // Background to verify widget is rendering
-              Container(
-                width: constraints.maxWidth,
-                height: constraints.maxHeight,
-                color: Colors.blue[50],
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.map, size: 64, color: Colors.blue[300]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Loading Map...',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.blue[700],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+      body: Stack(
+        children: [
+          // Simple background first
+          Container(
+            color: Colors.blue[50],
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.map, size: 64, color: Colors.blue[300]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Map Loading...',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.blue[700],
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
+                ],
               ),
-              // Try-catch wrapper for map
-              Builder(
-                builder: (context) {
-                  try {
-                    return SizedBox(
-                      width: constraints.maxWidth,
-                      height: constraints.maxHeight,
-                      child: FlutterMap(
+            ),
+          ),
+          // Map widget
+          Positioned.fill(
+            child: FlutterMap(
                         mapController: _mapController,
                         options: MapOptions(
                           initialCenter: _userLocation,
@@ -922,25 +913,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                     );
                   }).toList(),
                 ),
-                        ],
-                      ),
-                    );
-                  } catch (e) {
-                    debugPrint('Map error: $e');
-                    return Container(
-                      width: constraints.maxWidth,
-                      height: constraints.maxHeight,
-                      color: Colors.grey[200],
-                      child: Center(
-                        child: Text(
-                          'Map loading...',
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      ),
-                    );
-                  }
-                },
-              ),
+              ],
+            ),
+          ),
 
               // --- CONDITIONAL UI ---
           if (_isParked)
