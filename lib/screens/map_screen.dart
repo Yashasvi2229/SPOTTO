@@ -157,6 +157,111 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
   // --- COMPLETELY REWRITTEN LOCATION LOGIC ---
   Future<void> _determinePosition() async {
+    // On web, handle location differently
+    if (kIsWeb) {
+      // Prevent multiple requests
+      if (_isLocating) return;
+
+      if (mounted) {
+        setState(() {
+          _isLocating = true;
+          _currentPlacename = "Locating...";
+        });
+      }
+
+      try {
+        // On web, skip service check and go straight to permission
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        
+        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+          if (mounted) {
+            setState(() {
+              _currentPlacename = "Location permission denied";
+              _locationFetched = true;
+              _isLocating = false;
+            });
+            _fetchParkingZones();
+          }
+          return;
+        }
+
+        // Get current position
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 10),
+        );
+        
+        // Get address from coordinates
+        try {
+          List<Placemark> placemarks = await placemarkFromCoordinates(
+            position.latitude,
+            position.longitude,
+          );
+          
+          String address = placemarks.isNotEmpty
+              ? '${placemarks.first.street ?? ''}, ${placemarks.first.locality ?? ''}, ${placemarks.first.administrativeArea ?? ''}'
+              : '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+          
+          if (address.trim().isEmpty || address.trim() == ',') {
+            address = '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+          }
+
+          if (mounted) {
+            setState(() {
+              _userLocation = LatLng(position.latitude, position.longitude);
+              _locationFetched = true;
+              _currentPlacename = address;
+              _isLocating = false;
+              _currentZoom = 18.0;
+              _mapController.move(_userLocation, _currentZoom);
+              
+              // Update original location with the actual GPS location
+              _originalLocation = _userLocation;
+              _originalPlacename = address;
+            });
+            // Now that location is found, fetch parking zones
+            _fetchParkingZones();
+          }
+        } catch (geocodeError) {
+          // If geocoding fails, still use the coordinates
+          String address = '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+          if (mounted) {
+            setState(() {
+              _userLocation = LatLng(position.latitude, position.longitude);
+              _locationFetched = true;
+              _currentPlacename = address;
+              _isLocating = false;
+              _currentZoom = 18.0;
+              _mapController.move(_userLocation, _currentZoom);
+              _originalLocation = _userLocation;
+              _originalPlacename = address;
+            });
+            _fetchParkingZones();
+          }
+        }
+      } catch (error) {
+        debugPrint('Location error: $error');
+        if (mounted) {
+          setState(() {
+            _currentPlacename = "Error finding location. Using default location.";
+            _isLocating = false;
+            _locationFetched = true;
+            
+            if (_originalLocation == null) {
+              _originalLocation = _userLocation;
+              _originalPlacename = _currentPlacename;
+            }
+          });
+          _fetchParkingZones();
+        }
+      }
+      return;
+    }
+
+    // Mobile location logic
     // 1. Check if GPS service is enabled
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -211,60 +316,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
     // 4. Cancel any old stream
     await _positionStreamSubscription?.cancel();
-
-    // 5. On web, use getCurrentPosition instead of stream (more reliable)
-    if (kIsWeb) {
-      try {
-        Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-        
-        // Get address from coordinates
-        List<Placemark> placemarks = await placemarkFromCoordinates(
-          position.latitude,
-          position.longitude,
-        );
-        
-        String address = placemarks.isNotEmpty
-            ? '${placemarks.first.street}, ${placemarks.first.locality}, ${placemarks.first.administrativeArea}'
-            : '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
-
-        if (mounted) {
-          setState(() {
-            _userLocation = LatLng(position.latitude, position.longitude);
-            _locationFetched = true;
-            _currentPlacename = address;
-            _isLocating = false;
-            _currentZoom = 18.0;
-            _mapController.move(_userLocation, _currentZoom);
-            
-            // Update original location with the actual GPS location
-            _originalLocation = _userLocation;
-            _originalPlacename = address;
-          });
-          // Now that location is found, fetch parking zones
-          _fetchParkingZones();
-        }
-      } catch (error) {
-        if (mounted) {
-          setState(() {
-            _currentPlacename = "Error finding location. Using default location.";
-            _isLocating = false;
-            // Still mark as fetched so we can show zones
-            _locationFetched = true;
-            
-            // Store original location if not already stored (using default)
-            if (_originalLocation == null) {
-              _originalLocation = _userLocation;
-              _originalPlacename = _currentPlacename;
-            }
-          });
-          // Load zones even if location failed
-          _fetchParkingZones();
-        }
-      }
-      return;
-    }
 
     // 5. Start a new location stream (for mobile)
     _positionStreamSubscription = Geolocator.getPositionStream(
