@@ -1183,6 +1183,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         initialChildSize: 0.25,
         minChildSize: 0.1,
         maxChildSize: 0.8,
+        snap: true,
+        snapSizes: const [0.25, 0.5, 0.8],
         builder: (_, scrollController) {
           return Container(
           decoration: BoxDecoration(
@@ -1200,6 +1202,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
           ),
           child: ListView(
             controller: scrollController,
+            physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.all(0),
             children: [
               Center(
