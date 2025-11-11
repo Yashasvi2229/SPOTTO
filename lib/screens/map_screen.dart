@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
@@ -108,7 +109,20 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         }
     );
     // Also run the check once on init
-    _determinePosition();
+    // On web, skip GPS and just load zones with default location
+    if (kIsWeb) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          setState(() {
+            _locationFetched = true;
+            _currentPlacename = "Pune, Maharashtra";
+          });
+          _fetchParkingZones();
+        }
+      });
+    } else {
+      _determinePosition();
+    }
   }
 
   Future<void> _showEnableGpsDialog() async {
