@@ -759,34 +759,39 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _userLocation,
-              initialZoom: 18.0,
-              onTap: (tapPos, latlng) {
-                if (!_isParked && zones.isNotEmpty) {
-                  for (final zone in zones) {
-                    if (_pointInPolygon(latlng, zone.boundaries)) {
-                      _onZoneTap(zone);
-                      return;
-                    }
-                  }
-                }
-              },
-            ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
             children: [
-              TileLayer(
-                urlTemplate:
-                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.spotto',
-                maxZoom: 19,
-                errorTileCallback: (tile, error, stackTrace) {
-                  debugPrint('Tile error: $error');
-                },
-              ),
+              SizedBox(
+                width: constraints.maxWidth,
+                height: constraints.maxHeight,
+                child: FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: _userLocation,
+                    initialZoom: 18.0,
+                    onTap: (tapPos, latlng) {
+                      if (!_isParked && zones.isNotEmpty) {
+                        for (final zone in zones) {
+                          if (_pointInPolygon(latlng, zone.boundaries)) {
+                            _onZoneTap(zone);
+                            return;
+                          }
+                        }
+                      }
+                    },
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.spotto',
+                      maxZoom: 19,
+                      errorTileCallback: (tile, error, stackTrace) {
+                        debugPrint('Tile error: $error');
+                      },
+                    ),
               if (zones.isNotEmpty)
                 PolygonLayer(
                   polygons: zones.map((zone) {
@@ -873,10 +878,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                     );
                   }).toList(),
                 ),
-            ],
-          ),
+                  ],
+                ),
+              ),
 
-          // --- CONDITIONAL UI ---
+              // --- CONDITIONAL UI ---
           if (_isParked)
             _buildActiveParkingCard()
           else
@@ -1111,8 +1117,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
           if (_showSearchOverlay)
             _buildSearchOverlay(),
 
-        ],
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 
