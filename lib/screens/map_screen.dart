@@ -780,10 +780,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             children: [
               TileLayer(
                 urlTemplate:
-                'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
+                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.spotto',
-                retinaMode: true,
+                maxZoom: 19,
+                errorTileCallback: (tile, error, stackTrace) {
+                  debugPrint('Tile error: $error');
+                },
               ),
               if (zones.isNotEmpty)
                 PolygonLayer(
