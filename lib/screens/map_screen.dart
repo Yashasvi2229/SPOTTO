@@ -763,6 +763,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         builder: (context, constraints) {
           return Stack(
             children: [
+              // Background to verify widget is rendering
+              Container(
+                width: constraints.maxWidth,
+                height: constraints.maxHeight,
+                color: Colors.grey[100],
+              ),
               SizedBox(
                 width: constraints.maxWidth,
                 height: constraints.maxHeight,
@@ -784,10 +790,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate:
-                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      subdomains: const ['a', 'b', 'c'],
                       userAgentPackageName: 'com.example.spotto',
                       maxZoom: 19,
+                      tileProvider: NetworkTileProvider(),
                       errorTileCallback: (tile, error, stackTrace) {
                         debugPrint('Tile error: $error');
                       },
