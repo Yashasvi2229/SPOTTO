@@ -1,0 +1,30 @@
+[33m3434769[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Fix missing @override annotation for dispose method
+[33mf6ab41a[m Fix web location detection - skip service check and improve error handling
+[33m5c286f1[m Enable GPS location detection on web using browser geolocation API
+[33m8d37112[m Fix bottom sheet - restore simple ListView structure for proper dragging
+[33m879f5f3[m Fix bottom sheet structure - use Column with Expanded for proper scrolling
+[33m95f7ddf[m Fix bottom sheet scrolling - add snap and proper physics
+[33m30f0e20[m Restore actual map - screen is now rendering correctly
+[33mf68f254[m Skip Geolocator completely on web to prevent initialization errors
+[33m8a09322[m Add error handling and SafeArea to MapScreen for web
+[33me49a742[m TEMP: Show simple UI on web to verify screen renders
+[33m03029a6[m Fix syntax error - correct Stack closing brackets
+[33m1b160df[m Simplify map structure - remove LayoutBuilder and use Positioned.fill
+[33m600980a[m Add fallback UI and error handling for map rendering on web
+[33mb413028[m Update pubspec dependencies
+[33md71b7d8[m Add web-specific handling - skip GPS on web and load map with default location
+[33m379144c[m Simplify tile layer - remove subdomains and NetworkTileProvider for web compatibility
+[33m9177488[m Add background container and improve tile layer configuration for web
+[33m58eb873[m Fix syntax error - correct LayoutBuilder closing brackets
+[33mef2052c[m Fix map rendering on web - add explicit sizing with LayoutBuilder
+[33ma342a3e[m Fix map tiles - use OpenStreetMap for better web compatibility
+[33mfa49541[m Fix base href for GitHub Pages subdirectory deployment
+[33m63c3a29[m Downgrade google_fonts to 6.3.0 for Dart 3.6 compatibility
+[33md83c130[m Downgrade flutter_lints to 5.0.0 for Dart 3.6 compatibility
+[33mb165e19[m Fix Flutter version - use 3.27.0 for Dart 3.8+ compatibility
+[33mf0aedc7[m Fix Flutter version compatibility - use latest stable
+[33m60f09ac[m Update GitHub Pages workflow with .nojekyll and add troubleshooting guides
+[33m8729879[m github pages take 2
+[33m2e24d41[m trying web app through github pages
+[33me2e859a[m Merge branch 'main' of https://github.com/Yashasvi2229/SPOTTO
+[33mb2e6885[m trying to make website
