@@ -15,7 +15,9 @@ import 'total_fare_screen.dart';
 
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final Function(bool)? onParkingStateChanged;
+  
+  const MapScreen({super.key, this.onParkingStateChanged});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -812,6 +814,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       _isParked = true;
       _parkedZone = zone;
     });
+    // Notify parent about parking state change
+    widget.onParkingStateChanged?.call(true);
     _startParkingTimer();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -847,6 +851,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       _isParked = false;
       _parkedZone = null;
     });
+    // Notify parent about parking state change
+    widget.onParkingStateChanged?.call(false);
     _parkingTimer?.cancel();
     _parkingDuration = Duration.zero;
     

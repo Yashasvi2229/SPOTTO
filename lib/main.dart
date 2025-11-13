@@ -99,12 +99,19 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  bool _isParkingActive = false;
 
-  final List<Widget> _screens = [
+  List<Widget> get _screens => [
     Builder(
       builder: (context) {
         try {
-          return const MapScreen();
+          return MapScreen(
+            onParkingStateChanged: (isParked) {
+              setState(() {
+                _isParkingActive = isParked;
+              });
+            },
+          );
         } catch (e) {
           return Scaffold(
             body: Center(
@@ -128,7 +135,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: _isParkingActive ? null : NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: _onItemTapped,
         destinations: const [
